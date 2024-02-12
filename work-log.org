@@ -1,0 +1,98 @@
+sudo dnf install java-latest-openjdk
+lein repl, downloads a lot of stuff
+
+wont start out of the box
+
+changed some versions
+https://github.com/overtone/overtone/issues/497
+
+scsynth -t 57110
+
+(moved to deps.edn rather than project.clj)
+clojure
+(use 'overtone.core)
+(connect-external-server 57110)
+
+jack_lsp needs to exists, overtone needs it to check stuff, even on
+pipewire install
+
+use qjackctl or similar to conenct supercollider to out jack ports so
+you can hear sound
+
+now this should make a noise.
+(demo (sin-osc))
+
+made strek technobabble samples using cli wrapper for the bark model,
+on uber, which has 8gb gpu(small by todays standards)
+
+[2023-07-06 Thu]
+its erally hard to get this to work if theres no internet, atm im on a
+plane and jack_lsp seems to be missing again.
+
+tried creating a dummy jack_lsp, but still no go.
+
+[2024-02-02 Fri]
+tried, this time actually day before going on plane.
+
+scsynth -t 57110
+m-x cider-jack-in
+(use 'overtone.core)
+(connect-external-server 57110)
+
+fail. argh!
+
+https://github.com/overtone/overtone/releases/tag/v0.13.3177
+
+det går inte att få det här att funka!
+rippa ut allt som inte har med ljudgenerering att göra? dvs all
+"sylt"?
+
+--
+gör bara exakt så här, från overtone readme [2024-02-02 Fri]
+mkdir happy-vibes && cd happy-vibes
+echo '{:deps {overtone/overtone {:mvn/version "0.13.3177"}}}' > deps.edn
+clj
+
+Clojure 1.11.1
+user=>
+
+$ clojure --version
+Clojure CLI version 1.11.1.1413
+
+$ scsynth -v
+scsynth 3.13.0 (Built from  '' [na])
+
+;; boot the server
+user=> (use 'overtone.live)
+--> Loading Overtone...
+[overtone.live] [INFO] Found SuperCollider server: /usr/bin/scsynth (PATH)
+--> Booting external SuperCollider server...
+--> Connecting to external SuperCollider server: 127.0.0.1:26325
+[scynth] SuperCollider 3 server ready.
+--> Connection established
+
+;; listen to the joys of a simple sine wave
+user=> (demo (sin-osc))
+
+;; or something more interesting...
+user=> (demo 7 (lpf (mix (saw [50 (line 100 1600 5) 101 100.5]))
+                    (lin-lin (lf-tri (line 2 20 5)) -1 1 400 4000)))
+
+
+koppla sedan "overtone" till nån fungerande audioutgång med qjackctl
+
+notera:
+- overtone startar själv en extern scsynth, inget meck med att starta
+  den själv och koppla ihop. bra!
+- deps.edn gör det hela extremt minimalt. bra!
+- allt funkar med moderna clojure versioner och supercollider. bra!
+
+mitt överdrivet komplexa sylt projekt borde bara förenklas tills den är
+minimal den med, ingen lein eller nånting -> minisylt2024
+
+[2024-02-03 Sat]
+på planet. det funkar skapligt!
+såkalrt var det dumt att använda ocachade freesound samples. de laddas
+inte på planet. jag har strippat ut mycket, men freesound kvarstår.
+istället borde jag ha nån sorts egen sample bank, som kan hämta
+samples från freesound om så önskas.

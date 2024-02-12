@@ -1,0 +1,15 @@
+* About Sylt-core
+
+Sylt core is a refactor of my other Overtone repo, Sylt.
+
+So sylt-core is just the Overtone parts, and the collab parts will
+remain in Sylt.
+
+The refactor made it way easier for me to use Overtone on a plane. I
+have a personal challenge to be able to have fun with a computer with
+no internet.
+
+If you can find anything useful here, I would be most pleased.
+
+
+/Joakim
