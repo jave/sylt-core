@@ -1,0 +1,7 @@
+;;deps.edn 
+{:deps {
+        ;;org.clojure/clojure {:mvn/version 1.11.1}
+        ;;org.clojure/tools.trace {:mvn/version "0.7.11"}
+        overtone/overtone {:mvn/version "0.13.3177"}
+        }}
+ 
