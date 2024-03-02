@@ -1,3 +1,5 @@
+;; 2024-03-02 discovered i had 2 widely divergent versions of sylt lying around, lets try to bring them together
+
 ;; * namespace declaration
 (ns insane-noises.core
   (:require [overtone.api])

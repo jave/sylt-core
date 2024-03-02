@@ -1,3 +1,5 @@
+;; 2024-03-02 discovered i had 2 widely divergent versions of sylt lying around, lets try to bring them together
+
 ;; * namespace declaration
 ;; the overtone live and core seems to clash, so you need to select one of them
 ;;(load-file "/home/joakim/overtone-sylt/sylt-docker/sylt/src/insane_noises/core.clj")
