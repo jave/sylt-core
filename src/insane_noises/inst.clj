@@ -18,6 +18,86 @@
 ;; #+END_SRC
 
 
+;; * Some industrial soounding beats
+;; I modified some of the dubstep in the tutorials to arrive at these nice harsh beats.
+
+(definst industrial [bpm 250 wobble 1 note 32 snare-vol 1 kick-vol 1 v 1]
+ (let [trig (impulse:kr (/ bpm 120))
+       freq (midicps note)
+       swr (demand trig 0 (dseq [wobble] INF))
+       sweep (lin-exp (lf-tri swr) -1 1 40 3000)
+       wob (apply + (saw (* freq [0.99 1.01])))
+       wob (lpf wob sweep)
+       wob (* 0.8 (normalizer wob))
+       wob (+ wob (bpf wob 1500 2))
+       wob (+ wob (* 0.2 (g-verb wob 9 0.7 0.7)))
+
+       kickenv (decay (t2a (demand (impulse:kr (/ bpm 30)) 0
+                                   (dseq [1 0 0 0
+                                          1 0 0 0
+                                          1 0 0 0
+                                          1 0 0 0] INF)
+                                   )) 0.7)
+       bassenv (decay (t2a (demand (impulse:kr (/ bpm 30)) 0
+                                   (dseq [1 0 1 0
+                                          1 0 1 0
+                                          1 0 1 0
+                                          1 0 1 0] INF)
+                                   )) 0.7)       
+
+       kick (* (* kickenv 7) (sin-osc (+ 40 (* kickenv kickenv kickenv 200))))
+       kick (clip2 kick 1)
+
+       bass (* (* bassenv 7) (sin-osc (+ 40 (* kickenv kickenv kickenv 200))))
+       bass (clip2 bass 1)
+
+       snare (* 3 (pink-noise) (apply + (* (decay (impulse (/ bpm 240) 0.5) [0.4 2]) [1 0.05])))
+       snare (+ snare (bpf (* 4 snare) 2000))
+       snare (clip2 snare 1)]
+
+      (* v (clip2 (+ wob bass (* kick-vol kick) (* snare-vol snare)) 1))))
+
+;; to be used in "engine room" song
+
+(definst industrial2 [bpm 250 wobble 1 note 32 snare-vol 1 kick-vol 1 v 1 wobble-vol 1 bass-vol 1]
+ (let [trig (impulse:kr (/ bpm 120))
+       freq (midicps note)
+       swr (demand trig 0 (dseq [wobble] INF))
+       sweep (lin-exp (lf-tri swr) -1 1 40 3000)
+       wob (apply + (saw (* freq [0.99 1.01])))
+       wob (lpf wob sweep)
+       wob (* 0.8 (normalizer wob))
+       wob (+ wob (bpf wob 1500 2))
+       wob (+ wob (* 0.2 (g-verb wob 9 0.7 0.7)))
+
+       kickenv (decay (t2a (demand (impulse:kr (/ bpm 30)) 0
+                                   (dseq [1 0 0 0
+                                          1 0 0 0
+                                          1 0 0 0
+                                          1 0 0 0] INF)
+                                   )) 0.7)
+       bassenv (decay (t2a (demand (impulse:kr (/ bpm 30)) 0
+                                   (dseq [1 0 1 0
+                                          1 0 1 0
+                                          1 0 1 0
+                                          1 0 1 0] INF)
+                                   )) 0.7)       
+
+       kick (* (* kickenv 7) (sin-osc (+ 40 (* kickenv kickenv kickenv 200))))
+       kick (clip2 kick 1)
+
+       bass (* (* bassenv 7) (lpf (saw 50)) 25)
+       bass (clip2 bass 1)
+
+       snare (* 3 (pink-noise) (apply + (* (decay (impulse (/ bpm 240) 0.5) [0.4 2]) [1 0.05])))
+       snare (+ snare (bpf (* 4 snare) 2000))
+       snare (clip2 snare 1)]
+
+       (* v (clip2 (+ (* wobble-vol wob)
+                             (* bass-vol bass)
+                             (* kick-vol kick) (* snare-vol snare)) 1))))
+
+
 ;; * First, we'll define some percussive instruments
 
 ;; this high hat instrument takes a white noise generator and shapes

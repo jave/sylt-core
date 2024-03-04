@@ -1,4 +1,4 @@
-(ns insane-noises.seq
+(ns insane-noises.loseq
   (:require [overtone.api])
   (:use
    [overtone.live] ;; for the internal sc server
