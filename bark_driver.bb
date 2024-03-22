@@ -21,10 +21,12 @@
   (with-open [rdr (clojure.java.io/reader textfile)]
     (doall (line-seq rdr))))
 
+(def dryrun (atom  false))
 (defn bark [line voice path counter]
-  (let [cmd (str "python -m  bark --text \""  line "\" --history_prompt " voice " --output_filename " (str path "/" (format-string-as-filename counter line) ".wav"))]
+  (let [outfile (str path "/" (format-string-as-filename counter line) ".wav")
+        cmd (str "python -m  bark --text \""  line "\" --history_prompt " voice " --output_filename " outfile)]
     (timbre/info cmd)
-    (if (not (= "" line))
+    (if (not (or (fs/exists? outfile) @dryrun (= "" line)))
       (shell {:env {"VIRTUAL_ENV" "/mnt/big/roles/ai/mybark/bark20240221/venv"
                     "PATH" "/mnt/big/roles/ai/mybark/bark20240221/venv/bin" }} cmd  ))
     )
@@ -55,12 +57,30 @@
 
   )
 
+(def help
+  "--lines: input file is line oriented, each line is a bark run
+--sentences: input file is sentence oriented, a sentence ends with a period or question mark
+--edn: input file is edn
+--voice: bark voice
+--textfile: input file
+--path: where to write samples
+
+reasons not to call bark:
+--dryrun: dont really call bark
+empty lines
+existing files
+
+")
+
 (defn -main [args]
   (timbre/info "starting")
   (fs/create-dirs (:path args))
+  (if (:dryrun args) (reset! dryrun true))
   (cond 
+    (:help args) (println help)
     (:lines args ) (process-text (:textfile args) (:voice args) (:path args))
     (:sentences args)  (process-sentences (:textfile args) (:voice args) (:path args))
+    (:edn args)  (process-sentences (:textfile args) (:voice args) (:path args))
     )
   (timbre/info "stoping")
   )
