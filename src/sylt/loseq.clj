@@ -176,7 +176,7 @@ undefined voices are dropped"
               )
             ;; since its not really possible atm to guarantee that the stuff in the sequence is compatible with the drum function,
             ;; errors are simply catched and ignored. otherwise the entire sequence stops which i dont want
-            (catch Exception e (println "uncompatible drum fn"))
+            (catch Exception e (println "uncompatible drum fn" e))
             ) 
           
           )
@@ -294,3 +294,28 @@ undefined voices are dropped"
 ;;(play-arpeggio :BL  '(0 1 2 3 2 1 ) (chord-degree :i :d4 :major) 1 )
 ;;(play-arpeggio :BL  '(0 1 2 3 ) (chord-degree :i :d4 :minor) 1 )
 ;;(play-arpeggio :BL  '(0 1 2 3 ) (chord-degree :i :d4 :diminished) 1 )
+
+;; * ramp
+;; ramp from start to stop, in time-ms
+;; ramp from start to stop, inc every 100ms
+(defn ctl-ramp-2 [start stop inc ramp-fn]
+  (let [cur (+ start inc)]
+    (if (< start stop)
+      (do
+        ;;(println cur)
+        (ramp-fn cur)
+        ;;apply our ramp-fn, every 100 ms, until the ramp is done
+        (apply-at (+ 100 (now)) ctl-ramp-2 [cur stop inc ramp-fn]  ))
+      ;; else we are done and do naught
+      ;;(println "done")
+      )))
+
+(defn ctl-ramp [start stop time-ms ramp-fn]
+  (ctl-ramp-2 start stop
+              (/ (- stop start) (/ time-ms 100.0))
+              ramp-fn))
+
+
+;; just test the ramp
+;; (ctl-ramp 0 100 10000 #(println %))
+

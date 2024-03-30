@@ -1,10 +1,21 @@
 ;; * namespace declaration
+;; boot the server
+;; do this 1st manually, wait, and the cider-eval-buffer
+;;(require '[overtone.live])
+;; sleep so the server boots, before loading it with stuff
+;;(require '[overtone.inst synth piano drum sampled-piano])
+;;(demo (sampled-piano))
+;;(Thread/sleep 10000)
+;;now continue 
 (ns sylt.core
   (:require [overtone.api]
-            [sylt.loseq :as seq])
+            [overtone.live]
+            [sylt.loseq :as seq]
+            [overtone.inst.sampled-piano :refer :all]
+            [overtone.inst.piano :refer :all])
   (:use
    [overtone.live] ;; overtone boots an external scsynth
-   [overtone.inst synth piano drum]
+   [overtone.inst synth piano drum sampled-piano]
    [overtone.examples.instruments space monotron]
    [sylt.inst]
    )
@@ -12,30 +23,6 @@
 
 ;; just to see everything works and we get sound, rig connections with qjackctl
 (demo (sin-osc))
-
-;; * ramp
-;; ramp from start to stop, in time-ms
-;; ramp from start to stop, inc every 100ms
-(defn ctl-ramp-2 [start stop inc ramp-fn]
-  (let [cur (+ start inc)]
-    (if (< start stop)
-      (do
-        ;;(println cur)
-        (ramp-fn cur)
-        ;;apply our ramp-fn, every 100 ms, until the ramp is done
-        (apply-at (+ 100 (now)) ctl-ramp-2 [cur stop inc ramp-fn]  ))
-      ;; else we are done and do naught
-      ;;(println "done")
-      )))
-
-(defn ctl-ramp [start stop time-ms ramp-fn]
-  (ctl-ramp-2 start stop
-              (/ (- stop start) (/ time-ms 100.0))
-              ramp-fn))
-
-
-;; just test the ramp
-;; (ctl-ramp 0 100 10000 #(println %))
 
 
 ;; * Song: Lexical Libation: In the Engine Room
@@ -69,7 +56,7 @@
                   (fn[](do (def d (industrial2 :bpm 0))
                           (truck)
                           (inst-volume! truck 3)
-                          (ctl-ramp 0 250 16000  #(ctl d :bpm %))
+                          (seq/ctl-ramp 0 250 16000  #(ctl d :bpm %))
                           ;; start automatic mods of industrial
                           (auto-ind2 0) ))
                   "1" (fn[] (do
@@ -118,7 +105,7 @@
 
   (inst-volume! industrial2 1)
   ;; ramp
-  (ctl-ramp 0 1 16000  #(inst-volume! industrial2 %))
+  (seq/ctl-ramp 0 1 16000  #(inst-volume! industrial2 %))
 
   ;; inst-fx! returns a node, that then can be ctl:d
   (ind2-state 0)
@@ -1858,14 +1845,20 @@
                    :C (fn [x] (clap))
                    :E (fn [x] (cond (= 'e x)  (inst-fx! clap fx-echo)
                                                (= 's x) (clear-fx clap)))
-                   :CH (fn [a b] (seq/play-chord (chord-degree a b :ionian) saw2))
+                  :CH (fn [a b] (seq/play-chord (chord-degree a b :phrygian) sampled-piano ;; was saw2
+                                               ))
+                  :piano (fn [x] (sampled-piano x))
                    :BL (fn [x] (tsts (midi->hz(note x))))
                   :R (fn [x]     (risset :freq 100 :amp 0.9) (risset :freq 101 :amp 0.9))
                   :RO (fn [f a]     (risset :freq f :amp a) (risset :freq (+ f 1) :amp a))
                    :F (fn [x]     (ctl sf :freq (midi->hz(note x))))
                   :F2      (fn [x]  (seq/play-once (seq/mk-arpeggio-pattern :F  '(0 2 1) (chord-degree x :c2 :ionian) 0  ))    )
-                  :V (fn [x] (pack-speech-n (swap! pack-next #(if (= (dec (count pack-samples)) %) 0 (inc %)))))
-                   })
+                  :F3      (fn [x y]  (seq/play-once (seq/mk-arpeggio-pattern :piano  (choose-n 2 '(0 2 1 3)) (chord-degree x :c2 :zhi) 0  ))    )
+                  ;;:V (fn [x] (pack-speech-n (swap! pack-next #(if (= (dec (count pack-samples)) %) 0 (inc %)))))
+                  })
+
+;; start bisect
+;(choose-n 3 [1 2 3] )
 (seq/play-chord   (chord-degree :iii :d4 :ionian) saw2)
   ;;turned out nice, even though its a test track
   (seq/set-beat  {
@@ -1878,10 +1871,34 @@
                    {:voice :B :il 5 :id 0} '[c o ]
                    {:voice :B :il 3 :id 1} '[c o ]
 ;                   :C '[- - - x]
-                   {:voice :E :il 15 } '[e - -  - - s  ]
+                  {:voice :E :il 15 } '[e - -  - - s  ]
+                  ;; here it would be nice with a feature like  {:voice :CH :args [:phrygian :d4] } '[[:iii] - - - [:ii] - -  [:i] - - - [:iv] - - ]
+                  ;; the call args would be expanded to [:phrygian :d4 :iii] for instance (exact order to be determined)
                    :CH '[[:iii :d4] - - - [:ii :d4] - -  [:i :d4] - - - [:iv :d4] - - ]
                    }
-                  )
+                 )
+
+;; missunderstood blues
+  (seq/set-beat  {
+                  :B '[x  - ]
+                  {:voice :B  :id 3} '[o - ]
+                  {:voice :H :il 3 }  '[c o ]
+                  {:voice :H :il 0 :id 0}'[c c ]
+                   ;;atm you comment out tracks to mute them
+                   ;;atm also you need :id 0, so the keys are unique
+                  {:voice :B :il 5 :id 0} '[c o ]
+                  {:voice :B :il 3 :id 1} '[c o ]
+                  :C '[- - - x]
+                  {:voice :E :il 15 } '[e - -  - - s  ]
+                  ;; here it would be nice with a feature like  {:voice :CH :args [:phrygian :d4] } '[[:iii] - - - [:ii] - -  [:i] - - - [:iv] - - ]
+                  ;; the call args would be expanded to [:phrygian :d4 :iii] for instance (exact order to be determined)
+                  ;;{:voice :CH :il 3} '[[:i :e4] [:i :e4][:i :e4][:i :e4] [:iv :e4][:iv :e4] [:i :e4][:i :e4] [:v :e4]  [:v :e4] [:i :e4] [:i :e4]]
+                  {:voice :CH :il 3} '[[:i :e4] - - - [:iv :e4] - - - [:v :e4]  -  [:i :e4] - ]                  
+                  {:voice :F3 :il 3} '[[:i :e4] [:i :e4][:i :e4][:i :e4] [:iv :e4][:iv :e4] [:i :e4][:i :e4] [:v :e4]  [:v :e4] [:i :e4] [:i :e4]]
+                  }
+                 )
+
+;;(seq/play-once (seq/mk-arpeggio-pattern :piano  '(0 2 1) (chord-degree :i :c2 :ionian) 0  ))
 
 (comment
 
@@ -1924,6 +1941,25 @@
 ;;(def *voice-insts (atom {}))
 ;;(seq/play-metro)
 ;;(sylt.loseq/clear-mute)
+
+(comment
+  (free-all-loaded-samples)
+  ;; if samples change on disk clear out cache before reloading
+)
+(def pack-samples (load-samples  "/home/joakim/roles/Creative/music/overtone-sylt/minisylt2024/pack_3/*.wav"))
+
+  (definst pack-speech [bufnum 0]
+    (play-buf :rate 0.5  :num-channels 1 :bufnum bufnum))
+
+
+  (defn pack-speech-n [n]
+    (pack-speech (nth pack-samples n)))
+(count pack-samples)
+
+;;(nth pack-samples 3)
+(def pack-next (atom 0))
+(pack-speech-n (swap! pack-next #(if (= (dec (count pack-samples)) %) 0 (inc %))))
+
 (def song-events {"init" (fn[]
                            (seq/set-drums {
                                            :B (fn [x]
@@ -1990,24 +2026,8 @@
                   "9" (fn[])
                   })
 
+;;end bisect
 
-
-
-(do 
-  (free-all-loaded-samples) ;; if samples change on disk clear out cache before reloading
-  (def pack-samples (load-samples  "/home/joakim/roles/Creative/music/overtone-sylt/minisylt2024/pack_3/*.wav")))
-
-  (definst pack-speech [bufnum 0]
-    (play-buf :rate 0.5  :num-channels 1 :bufnum bufnum))
-
-
-  (defn pack-speech-n [n]
-    (pack-speech (nth pack-samples n)))
-(count pack-samples)
-
-;;(nth pack-samples 3)
-(def pack-next (atom 0))
-(pack-speech-n (swap! pack-next #(if (= (dec (count pack-samples)) %) 0 (inc %))))
 
 
 (comment
@@ -2261,44 +2281,86 @@
 
 )
 
+;; * Song: upload me to your transhumanist utopia baby
 ;;gating experiments
-  (definst sin-gate [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4 gate 1]
+(definst sin-gate [freq 440 attack 0.01 sustain 0.4 release 0.1 vol 0.4 gate 1]
     (*
      ;;env    (env-gen (adsr att decay sus rel) gate :action FREE)
               (env-gen (adsr attack sustain release)  gate :action FREE)
      ;;(sin-osc freq)
-     (sin-osc freq)
+              (sin-osc freq)
      vol))
 ;;(sin-gate)
 ;;(ctl sin-gate :gate 0)
 
+(defn sin-gate-fn [& arg]
+  ;;    (println arg)
+  ;;(S) - stop the tone
+  ;;(:freq 440 :gate 1) - call the inst with these args, gate 0 the prev note
+  ;;- (dash) - do nothing, which means the prev note lives on due to gate
+  ;; this is kinda dumb, i should read up how u do pattern matching in clojure
+      (cond
+        (= '(S) arg) (do
+                       ;;(println "stop " arg)
+                       (ctl sin-gate :gate 0))
+        (and (= 1 (count arg)) (keyword? (first arg)))
+        (do
+          ;;(println "note " (first arg))
+          (ctl sin-gate :gate 0)
+          (sin-gate :freq (midi->hz (note (first arg)))))
+        (sequential? arg) (do
+                            ;;(println "seq " arg)
+                            (ctl sin-gate :gate 0) (apply sin-gate arg))
+        ) )
+
+
+
+;;(sin-gate-fn :a6)
+;;(sin-gate-fn :freq 220)
+
+
 (seq/set-drums
  {
   :G
-  (fn [& arg]
-    ;;    (println arg)
-    ;;(S) - stop the tone
-    ;;(:freq 440 :gate 1) - call the inst with these args, gate 0 the prev note
-    ;;- (dash) - do nothing, which means the prev note lives on due to gate
-      (cond
-        (= '(S) arg) (ctl sin-gate :gate 0)
-        (sequential? arg) (do (ctl sin-gate :gate 0) (apply sin-gate arg))
-          ) )
+  sin-gate-fn
   ;;:G sin-gate
+  :bfx (fn[x] (barkfx-n x))
+  :bfn (fn[x] (barkfx-n-next))
   }
  )
+;;(sin-gate (midi->hz (note :a3)))
+(demo (sin-osc (midi->hz (note :a3))))
+(demo (sin-osc (midi->hz (note :g#3))))
+(demo (sin-osc (midi->hz (note :b3))))
+(demo (sin-osc (midi->hz (note :a3))))
 
 (seq/set-beat
  {
-  :G '[[:freq 220 ]   -  [:freq 440 ] S [:freq 880] S [:freq 1760] S]
-})
+  ;;:G '[:a3   -  :a4 S [:freq 880] S [:freq 1760] S]
+  :G '[:a3   -  :a4 S :a5 S :a6 S
+       :g#3   -  :g#4 S :g#5 S :g#6 S
+       :b3   -  :b4 S :b5 S :b6 S
+       :a3   -  :a4 S :a5 S :a6 S
+       ]
+  {:voice :bfx :il (* 3 5 4)} '[0  1 0 2 0 3 0 ;; just sounds
+                                15 16 ;;deconstruction
+                                9 8  6  5 4 3 ;; nust sounds
+                                13 ;; upload me
+                                ;;7 ;; this is the modem sound which is thematic, but breaks the mood a bit
+                                ]
+  })
+;;(barkfx-n 7) modem
+;;(midi->hz (note :a3))
 
 (comment
   (seq/set-metro :bpm 200 :il 3)
-  (seq/play-metro)
 
   (inst-fx! sin-gate fx-distortion-tubescreamer )
+  (inst-fx! sin-gate fx-echo )
+  (inst-fx! sin-gate fx-g-verb)
+  (inst-fx! sin-gate fx-chorus)
   (clear-fx  sin-gate)
+  (inst-volume! sin-gate 0.1)
 )
 
 ;; * experiments
@@ -2380,4 +2442,101 @@
 (inst-fx! ping fx-chorus)
 (demo (risset :freq 700))
 
+
+;;these dont work, i dont have mdapiano installed on fedora apparently
+(demo (mda-piano))
+(demo (piano))
+
+;;weird mouse controlled instr, a bunch of them are i guess!
+(demo (ks-stringer))
+(inst-fx! ks-stringer fx-chorus)
+
+(inst-fx! ks1-demo fx-echo)
+(inst-fx! ks1-demo fx-resonz)
+(inst-fx! ks1-demo fx-chorus)
+(inst-fx! sampled-piano fx-echo)
+(clear-fx ks1-demo)
+
+(defsynth fx-resonz
+  [bus 0 freq 200 bwr 0.05]
+  (let [src (in bus)]
+    (replace-out bus (resonz src freq bwr))))
+
+(defn barkfx-n-next []    (barkfx-n (swap! barkfx-next #(if (= (dec (count barkfx-samples)) %) 0 (inc %)))))
+
+(do
+  ;;(demo (sampled-piano))
+    (demo (ks1-demo ))
+    (barkfx-n (swap! barkfx-next #(if (= (dec (count barkfx-samples)) %) 0 (inc %))))
+    (mystr2 110)
+    (mystr2 (midi->hz (note :a2)))
+    (mystr2 440)
+    (mystr 440)
+;;    (mystr 440)
+    ;;(mystr 880)
+    )
+
+(definst mystr2 [freq 440]
+  (let
+      [fenv   (env-gen (perc 0.5 10) :action FREE)
+       freqlfo  (lin-lin (lf-tri:kr  3.4) -1 1 1 1.01)
+       apulsel (pulse:ar (* freqlfo freq) (lin-lin (sin-osc:kr 6) -1 1 0.5 0.6  ))
+       apulser (pulse:ar (* freqlfo freq) (lin-lin (sin-osc:kr 6) -1 1 0.5 0.8  ))       
+       asaw1 (lf-tri:ar (* 2 (* freqlfo freq)))
+       asaw2 (lf-tri:ar (/ (* freqlfo freq) 2))
+       srcl (+  (* 0.1 asaw1)  (* 0.1 asaw1)
+                apulsel)
+       srcr (+  (* 0.1 asaw1)  (* 0.1 asaw1)
+                apulser)
+
+       srcl (rlpf srcl (* fenv 1500) 2 )
+       srcr (rlpf srcr (* fenv 1500) 2 )
+       ]
+    [srcl srcr]))
+(mystr2)
+(inst-volume! mystr2 2)
+(inst-fx! mystr2 fx-chorus)
+(inst-fx! mystr2 fx-echo)
+(inst-fx! mystr2 fx-resonz)
+(inst-fx! barkfx fx-g-verb )
+(inst-fx! barkfx fx-echo)
+(demo (fm-demo))
+(demo (harmonic-swimming))
+(demo (overtone.inst.drum/noise-snare))
+
+(def barkfx-samples (load-samples  "/home/joakim/roles/Creative/music/overtone-sylt/minisylt2024/barkfx/*.wav"))
+
+(definst barkfx [bufnum 0]
+    (play-buf :rate 0.5  :num-channels 1 :bufnum bufnum))
+
+
+(defn barkfx-n [n]
+  (barkfx (nth barkfx-samples n)))
+
+(barkfx-n 2)
+(def barkfx-next (atom 0))
+
+
+(definst my-harmonic-swimming
+  [amp 0.5]
+  (let [freq     1000
+        partials 200
+        z-init   0
+        offset   (line:kr 0 -0.02 60)
+        snd (loop [z z-init
+                   i 0]
+              (if (= partials i)
+                z
+                (let [f (clip:kr (mul-add
+                                   (lf-noise1:kr [(+ 16 (rand 8))
+                                                  (+ 16 (rand 8))])
+                                   0.2 offset))
+                      src  (f-sin-osc (* freq (inc i)))
+                      newz (mul-add src f z)]
+                  (recur newz (inc i)))))]
+     (pan2 (* amp snd))))
+
+(my-harmonic-swimming)
+
   )
+(demo (sampled-piano))
