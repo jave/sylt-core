@@ -507,7 +507,7 @@
   (let
       [fenv   (env-gen (perc 0.5 5) :action FREE)
        freqlfo  (lin-lin (lf-tri:kr  3.4) -1 1 1 1.01)
-       apulsel (pulse:ar (* freqlfo freq) (lin-lin (sin-osc:kr 6) -1 1 0.5 0.6  ))
+       apulsel (pulse:ar (* freqlfo freq) (lin-lin (sin-osc:kr 6) -1 1 0.5 0.8  ))
        apulser (pulse:ar (* freqlfo freq) (lin-lin (sin-osc:kr 6) -1 1 0.5 0.8  ))       
        asaw1 (lf-tri:ar (* 2 (* freqlfo freq)))
        asaw2 (lf-tri:ar (/ (* freqlfo freq) 2))

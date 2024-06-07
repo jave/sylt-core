@@ -5,6 +5,9 @@
 (require '[babashka.cli :as cli])
 (require '[babashka.fs :as fs])
 
+(require  '[clojure.edn :as edn] )
+(require '[clojure.java.io :as io])
+
 ;;python -m bark --text "Hello, my name is Suno." --output_filename "Downloads/example6.wav" --history_prompt "v2/it_speaker_4"
 
 
@@ -42,6 +45,34 @@
          
          )))
 
+(defn read-edn-file [file]
+  (-> file
+      slurp
+      edn/read-string))
+
+;;TODO this should take a default struct as arg, then process-edn can interate a list of defaults in the edn instead
+(defn process-edn-impl [ednfile default]
+  (let [edn-content (read-edn-file ednfile)
+        text (:text edn-content)
+        ;;default (:default edn-content)
+        ]
+
+    (if (:path default)
+      (fs/create-dirs (:path default) ))
+    
+    (doseq [x text] (bark (str (:prefix default)(:text x)(:postfix default))
+                          (get x :voice (:voice default) )
+                          (:path default) (:index x)))))
+
+(defn process-edn [m]
+  (doseq [default (:default (read-edn-file  (get-in m [:opts :file])))]
+    (process-edn-impl
+     (get-in m [:opts :file])
+     ;;(get-in m [:opts :path])
+     default
+     )))
+
+
 (defn process-sentences [filename voice path]
   (let [sentences (str/split (slurp filename) #"\.|\?|\:|\n\n")]
     (doseq [[index sentence] (map-indexed vector (filter #(not (= "" %)) sentences))]
@@ -57,8 +88,9 @@
 
   )
 
-(def help
-  "--lines: input file is line oriented, each line is a bark run
+(defn help []
+  (println 
+   "--lines: input file is line oriented, each line is a bark run
 --sentences: input file is sentence oriented, a sentence ends with a period or question mark
 --edn: input file is edn
 --voice: bark voice
@@ -70,22 +102,46 @@ reasons not to call bark:
 empty lines
 existing files
 
-")
+"))
 
-(defn -main [args]
+(defn process-edn-dbg [m]
+  (println m)
+  (println "process-edn")
+  (println (get-in m [:opts :file]))
+  (println (get-in m [:opts :voice]))
+  (println (get-in m [:opts :path]))  
+  )
+;; attempt to use dispatch
+(def table
+  [{:cmds ["text"]   :fn process-text :args->opts [:file :voice :path]
+    :spec {:file {:require true}
+           :voice {:require true}
+           :path {:require true}}
+    }
+   {:cmds ["sentences"] :fn process-sentences :args->opts [:file :voice :path]
+    :spec {:file {:require true}
+           :voice {:require true}
+           :path {:require true}}
+    }
+   {:cmds ["edn"] :fn process-edn
+    :args->opts [:file ]
+    :spec {:file {:require true}
+           }
+    }
+   ;;help is last
+   {:cmds ["help"]         :fn help}])
+
+
+(defn -main []
+  
   (timbre/info "starting")
-  (fs/create-dirs (:path args))
-  (if (:dryrun args) (reset! dryrun true))
-  (cond 
-    (:help args) (println help)
-    (:lines args ) (process-text (:textfile args) (:voice args) (:path args))
-    (:sentences args)  (process-sentences (:textfile args) (:voice args) (:path args))
-    (:edn args)  (process-sentences (:textfile args) (:voice args) (:path args))
-    )
+  (if (:dryrun (cli/parse-opts *command-line-args*))
+    (reset! dryrun true)
+    (if (:path (cli/parse-opts *command-line-args*))
+      (fs/create-dirs (:path (cli/parse-opts *command-line-args*)))))
+  (cli/dispatch table *command-line-args* )
   (timbre/info "stoping")
   )
 
-(-main (cli/parse-opts *command-line-args* {:require [:textfile :voice :path]}))
+(-main)
 
-;;https://suno-ai.notion.site/8b8e8749ed514b0cbf3f699013548683?v=bc67cff786b04b50b3ceb756fd05f68c
-;;bb bark_driver.bb --textfile test.txt --voice "v2/en_speaker_9" --path out

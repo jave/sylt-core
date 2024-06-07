@@ -154,34 +154,57 @@ if map, use the :voice key to lookup the drum
   (clear-mute)
   )
 
+
+(defn beat-eval [strct]
+  "go through BEAT, if it contains lambdas, eval them"
+  (let [eval-value (fn [v]
+                     (if (fn? v)
+                       (v)
+                       v))]
+    (reduce-kv (fn [m k v]
+                 (assoc m k (eval-value v)))
+               {}
+               strct)))
+;; Example Usage:
+;; (def example-structure
+;; {:voice :I,
+;; :il 0,
+;; :P '[1.0 1.1 1.2 1.0 1.1 1.12 0.9 1.12 1.3 0.1],
+;; :PV '[:a2 :b2 :c3 :d3],
+;; :computed (fn [] [:a2 :b2 :c3 :d3])})
+;; (beat-eval example-structure)
+
+
+
 (defn drum-fn [beat beat-count]
   "take a vertical slice out of BEAT, at BEAT-COUNT, and play this slice
 allows for voice patterns of different length
 undefined voices are dropped"
-  (doseq [[voice pattern] beat ;; 
-          ] ;; map over each voice/pattern pair
-    (let* [pattern (apply-drum-transform (get-drum-transform voice) pattern) ;;TODO
-           
-           pattern-il (get-drum-il voice)
-           pattern (il pattern-il pattern) ;; interleave
-           index (mod beat-count (count pattern) ) ;; *beat-count is global counter, make index modulo pattern length
-           drum (get-drum-fn voice)] ;;figure out the drum function for the voice
-      (if (and drum (not (get-mute-voice voice)) (not (= '- (nth pattern index)))) ;;play the drum if there a) is a drum and b) the pattern contains something that isnt "-"
-        (do
-          (try
-            (let [nthpattern (nth pattern  index)]
-              (if (sequential? nthpattern);; the drum arg can be a list or a single thing
-                (apply drum nthpattern)
-                (apply drum [nthpattern]))
-              )
-            ;; since its not really possible atm to guarantee that the stuff in the sequence is compatible with the drum function,
-            ;; errors are simply catched and ignored. otherwise the entire sequence stops which i dont want
-            (catch Exception e (println "uncompatible drum fn" e))
-            ) 
-          
+  (let [beat-evaled (beat-eval beat)]
+    (doseq [[voice pattern] beat-evaled ;; 
+            ] ;; map over each voice/pattern pair
+      (let* [pattern (apply-drum-transform (get-drum-transform voice) pattern) ;;TODO
+             
+             pattern-il (get-drum-il voice)
+             pattern (il pattern-il pattern) ;; interleave
+             index (mod beat-count (count pattern) ) ;; *beat-count is global counter, make index modulo pattern length
+             drum (get-drum-fn voice)] ;;figure out the drum function for the voice
+        (if (and drum (not (get-mute-voice voice)) (not (= '- (nth pattern index)))) ;;play the drum if there a) is a drum and b) the pattern contains something that isnt "-"
+          (do
+            (try
+              (let [nthpattern (nth pattern  index)]
+                (if (sequential? nthpattern);; the drum arg can be a list or a single thing
+                  (apply drum nthpattern)
+                  (apply drum [nthpattern]))
+                )
+              ;; since its not really possible atm to guarantee that the stuff in the sequence is compatible with the drum function,
+              ;; errors are simply catched and ignored. otherwise the entire sequence stops which i dont want
+              (catch Exception e (println "uncompatible drum fn" e))
+              ) 
+            
+            )
           )
-        )
-      )))
+        ))))
 
 (defn drum-fn-globalbeat []
   (drum-fn  @*beat @*beat-count)

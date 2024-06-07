@@ -1630,6 +1630,14 @@
   (mystr (* 2 f))
   (mystr (* 4 f) )
   (mystr (* 8 f)))
+
+(defn mystr3 [f]
+  (mystr f)
+  (mystr (* 2 f))
+  (mystr (* 4 f) )
+  (mystr (* 8 f)))
+(mystr3 50)
+(mystr2 50)
 (comment
   (inst-fx! mystr fx-chorus)
   (inst-fx! mystr fx-echo)
@@ -2318,6 +2326,19 @@
 ;;(sin-gate-fn :a6)
 ;;(sin-gate-fn :freq 220)
 
+(def barkfx-samples (load-samples  "/home/joakim/roles/Creative/music/overtone-sylt/minisylt2024/barkfx/*.wav"))
+
+(definst barkfx [bufnum 0]
+    (play-buf :rate 0.5  :num-channels 1 :bufnum bufnum))
+
+
+(defn barkfx-n [n]
+  (barkfx (nth barkfx-samples n)))
+
+(barkfx-n 2)
+(def barkfx-next (atom 0))
+
+(defn barkfx-n-next []    (barkfx-n (swap! barkfx-next #(if (= (dec (count barkfx-samples)) %) 0 (inc %)))))
 
 (seq/set-drums
  {
@@ -2358,6 +2379,7 @@
   (inst-fx! sin-gate fx-distortion-tubescreamer )
   (inst-fx! sin-gate fx-echo )
   (inst-fx! sin-gate fx-g-verb)
+  (inst-fx! sin-gate fx-resonz)
   (inst-fx! sin-gate fx-chorus)
   (clear-fx  sin-gate)
   (inst-volume! sin-gate 0.1)
@@ -2383,6 +2405,20 @@
         out (sin-osc linp 0 0.2)]
     out)
   )
+
+
+(defsynth fx-pitcher
+  [bus 0 pitch 0.1]
+  (let [src (in bus)]
+    (replace-out bus
+                 (pitch-shift:ar src
+                                 0.1
+                                 pitch;;(mouse-x:kr 0 2)
+                                 0
+                                 0.004)
+                 )))
+
+
 (comment
   (demo (sin-osc))
   (def a (line-reset 400 800 2))
@@ -2462,11 +2498,10 @@
   (let [src (in bus)]
     (replace-out bus (resonz src freq bwr))))
 
-(defn barkfx-n-next []    (barkfx-n (swap! barkfx-next #(if (= (dec (count barkfx-samples)) %) 0 (inc %)))))
 
-(do
+(defn wavething []
   ;;(demo (sampled-piano))
-    (demo (ks1-demo ))
+    (ks1-demo )
     (barkfx-n (swap! barkfx-next #(if (= (dec (count barkfx-samples)) %) 0 (inc %))))
     (mystr2 110)
     (mystr2 (midi->hz (note :a2)))
@@ -2474,13 +2509,17 @@
     (mystr 440)
 ;;    (mystr 440)
     ;;(mystr 880)
-    )
+  )
+
+(wavething)
+(inst-volume! mystr 0.1)
+
 
 (definst mystr2 [freq 440]
   (let
       [fenv   (env-gen (perc 0.5 10) :action FREE)
        freqlfo  (lin-lin (lf-tri:kr  3.4) -1 1 1 1.01)
-       apulsel (pulse:ar (* freqlfo freq) (lin-lin (sin-osc:kr 6) -1 1 0.5 0.6  ))
+       apulsel (pulse:ar (* freqlfo freq) (lin-lin (sin-osc:kr 6) -1 1 0.5 0.8  ))
        apulser (pulse:ar (* freqlfo freq) (lin-lin (sin-osc:kr 6) -1 1 0.5 0.8  ))       
        asaw1 (lf-tri:ar (* 2 (* freqlfo freq)))
        asaw2 (lf-tri:ar (/ (* freqlfo freq) 2))
@@ -2494,7 +2533,7 @@
        ]
     [srcl srcr]))
 (mystr2)
-(inst-volume! mystr2 2)
+(inst-volume! mystr2 1)
 (inst-fx! mystr2 fx-chorus)
 (inst-fx! mystr2 fx-echo)
 (inst-fx! mystr2 fx-resonz)
@@ -2504,17 +2543,6 @@
 (demo (harmonic-swimming))
 (demo (overtone.inst.drum/noise-snare))
 
-(def barkfx-samples (load-samples  "/home/joakim/roles/Creative/music/overtone-sylt/minisylt2024/barkfx/*.wav"))
-
-(definst barkfx [bufnum 0]
-    (play-buf :rate 0.5  :num-channels 1 :bufnum bufnum))
-
-
-(defn barkfx-n [n]
-  (barkfx (nth barkfx-samples n)))
-
-(barkfx-n 2)
-(def barkfx-next (atom 0))
 
 
 (definst my-harmonic-swimming
@@ -2536,7 +2564,368 @@
                   (recur newz (inc i)))))]
      (pan2 (* amp snd))))
 
-(my-harmonic-swimming)
+(demo (my-harmonic-swimming))
 
+;; pitch shifting
+(definst pitcher []
+  (pitch-shift:ar (sound-in:ar [0 1])
+                  0.1
+                  (mouse-x:kr 0 1.5)
+                  0
+                  0.004)
   )
+(demo (pitcher))
+
+;;https://soundcloud.com/joakimv/cybernetic-brainwave-transformation-unit
+(seq/set-drums
+ {:I (fn [x] (sampled-piano x))
+  :P (fn [x] (ctl pitchoid :pitch x))
+  :W (fn [x] (do (kick) (wavething)  ))
+  }
+ )
+(seq/set-beat
+ {:I '[40 50 60 70 90]
+  :P '[0.1 0.5 0.4 ]
+  :W '[1 - - - - - - - - ]
+  }
+ )
+
+
+(inst-fx! sampled-piano fx-echo)
+(inst-fx! sampled-piano fx-chorus)
+(seq/set-metro :bpm 40 )
+(seq/play-metro)
+
+
+(def pitchoid (inst-fx! sampled-piano fx-pitcher))
+
+(ctl pitchoid :pitch 0.3)
+
+(clear-fx sampled-piano)
+(demo (sampled-piano 40))
+(inst-fx! barkfx fx-pitcher)
+(inst-fx! babble fx-pitcher)
+
+(stop)
+(clear-fx babble)
+(demo (babble))
+(demo (barkfx))
+
+;; try with pitchshiftpa, but isnt here, need to load a quark
+;;https://github.com/dyfer/PitchShiftPA
+(definst pitcher2 []
+(pitch-shift-pa)
+  )
+
+(definst pitcher3 []
+    (pitch-shift:ar (sin-osc [100 200])
+                    0.1
+                    (mouse-x:kr 0 2)
+                    0
+                      0.004))
+(demo (pitcher3))
+(demo (sin-osc [100 200 400]))
+
 (demo (sampled-piano))
+
+(make-synth)
+
+
+;;pitch voices instead
+(def pitchoid (inst-fx! barkfx fx-pitcher))
+(def pitchoid (inst-fx! babble fx-pitcher))
+(clear-fx barkfx)
+
+)
+
+
+;; * song: ensol nevolen  (pacis)
+(def pacis-samples (load-samples  "/home/joakim/roles/Creative/music/overtone-sylt/minisylt2024/pacis4_6_edit_split/*.wav"))
+
+(definst pacis [bufnum 0]
+    (play-buf :rate 0.5  :num-channels 1 :bufnum bufnum))
+
+
+(defn pacis-n [n]
+  (pacis (nth pacis-samples n)))
+
+;;(pacis-n 2)
+(def pacis-next (atom 0))
+
+(defn pacis-n-next []    (pacis-n (swap! pacis-next #(if (= (dec (count pacis-samples)) %) 0 (inc %)))))
+;(pacis-n-next)
+
+(def pitchoid (inst-fx! pacis fx-pitcher))
+;; (inst-fx! pacis fx-g-verb)
+;; (inst-fx! pacis fx-chorus)
+(inst-fx! dub-kick fx-echo)
+(clear-fx pacis)
+(clear-fx dub-kick)
+
+(inst-fx! barkfx fx-echo)
+
+(clear-fx pacis)
+
+(def voc-a (buffer 2048))
+(def voc-b (buffer 2048))
+
+
+;;the vocoder is modulated on track 4 atm,
+;; currently i think the version where you turn off the modulation and just have a low bass, and no
+;; very little ha ha, on 7, is very cool
+
+(do (clear-fx pacis)
+    (defsynth fx-vocoder [bus 0 freq 440]
+  (let [input (in bus)
+        carrier (mix [(saw (* 1.01 freq)) (saw (* 0.99 freq))
+                      (saw (* 2 freq)) (saw (* 4 freq)) (saw (* 8 freq)) ;;(saw (* 16 freq)) ;;(saw (* 32 freq)) ;; you can add these incrementally
+                      ])
+        fft-in (pv-mag-smear (fft voc-a input) 20) ;; vary the 0 from 0 to 40 for different sounds
+        fft-carrier (pv-mag-smear (fft voc-b carrier) 1)
+        formed (pv-mul fft-in fft-carrier)
+        audio (ifft formed)
+        normalized (normalizer audio)]
+    (replace-out bus normalized)
+    ))
+    (def vocoid (inst-fx! pacis fx-vocoder)))
+
+;; (def band-frequencies
+;;   (let [bands 16]
+;;     (map #(Math/exp (/ % bands)
+;;                     (Math/log 100)
+;;                     (Math/log 8000)) 
+;;          (range 1 (inc bands)))))
+
+(def band-frequencies
+[100.0, 129.19693817759275, 166.81005372000593, 215.44346900318845,
+278.2559402207124, 359.3813663804626, 464.15888336127773,
+599.4842503189409, 774.263682681127,
+1000.0, 1291.9693817759262, 1668.100537200059,
+2154.434690031884, 2782.5594022071235,
+3593.813663804626, 4641.588833612776]
+)
+
+(defsynth fx-vocoder2
+  [bus 0 amp 0.1 freq 440 gated 1 pan 0]
+  (let [input (in bus)
+        ;;bands 16
+        ;;band-frequencies (lin-exp (range 1 (inc bands)) 1 bands 100 8000)
+        modulator input
+        carrier (saw:ar freq)
+        mod-localbuf (local-buf 2048)
+        car-localbuf (local-buf 2048)
+        env (env-gen:kr (env-asr 0.01 1 0.1) :gate gated :action 2)
+        balance-voice (mix:ar (bpf:ar input band-frequencies :rq 0.2))
+        analyse-freq
+        (doall (for [buf [mod-localbuf car-localbuf]]
+                 (pv-mag-smear (fft buf modulator) 1 )))
+        mod-pv (first analyse-freq)
+        car-pv (second analyse-freq)
+        voice (ifft (pv-mag-mul car-pv mod-pv))
+        sig (mix:ar [(white-noise:ar (balance-voice)) voice])]
+    (replace-out bus (pan2:ar (* sig env) pan amp))
+    ))
+
+;; ;; Play the synth
+;; (def inst (vocoder))
+
+;; ;; Route audio input channel, adjust to match your setup
+;; (connect s "in_1" inst "in")
+
+;; ;; Add freq sweep
+;; (def metro (metronome 60))
+;; (def freqs (lin-lin (range) (- 10) 10 60 200))
+;; (def mel-freq (demand:kr metro 0 (dseq freqs INF)))
+
+;; (definst note () 
+;;   (send inst "freq" mel-freq))
+
+
+
+
+
+(defsynth fx-vocoder-stereo [bus 0 freq 440]
+  (let [input (in bus)
+        srcl (mix [(saw (* 1.03 freq)) (saw (* 0.97 freq))])
+        srcr (mix [(saw (* 1.01 freq)) (saw (* 0.99 freq))])
+        formedl (pv-mul (fft voc-a input) (fft voc-b srcl))
+        formedr (pv-mul (fft voc-a input) (fft voc-b srcr))        
+        audiol (ifft formedl)
+        audior (ifft formedr)        
+        normalizedl (normalizer audiol)
+        normalizedr (normalizer audior)
+        ]
+    (replace-out bus [normalizedl normalizedr])
+    ))
+
+;;redefine, orig buggy
+(definst my-grunge-bass
+  [note 48 amp 1 dur 0.1 a 0.01 d 0.01 s 0.4 r 0.01 pan 0.0]
+  (let [freq    (midicps note)
+        env     (env-gen (adsr a d s r) (line:kr 1 0 (+ a d dur r 0.1))
+                         :action FREE)
+        src     (saw [freq (* 0.98 freq) (* 2.015 freq)])
+        src     (clip2 (* 1.3 src) 0.9)
+        sub     (sin-osc (/ freq 2))
+        filt    (resonz (rlpf src (* 8.4 freq) 0.29) (* 2.0 freq) 2.9)
+        meat    (ring4 filt sub)
+        sliced  (rlpf meat (* 2 freq) 0.1)
+        bounced (free-verb sliced 0.8 0.9 0.2)]
+    (pan2 (* amp env bounced) pan 8          )
+  ;;  (* amp env bounced)
+    ))
+
+;;(inst-fx! pacis fx-echo)
+(inst-volume! pacis 0.2)
+(inst-volume! closed-hat 0.2)
+(seq/set-drums
+ {:I (fn [x]     (pacis-n-next))
+  :P (fn [x] (ctl pitchoid :pitch x))
+  :PV (fn [x] (ctl vocoid :freq (midi->hz (note x))))
+  ;;:W (fn [x] (do (kick) (wavething)  ))
+  :B (fn [x]
+                     (cond
+                       (= 'c x)(electro-kick)
+                       (= 'o x) (dance-kick)
+                       (= 'd x) (dub-kick)
+                       (= '4 x) (kick4)
+                       (= '3 x) (kick3)
+                       (= '2 x) (kick2)
+                       (= '1 x) (kick)
+                       :else (do (electro-kick) (dance-kick)))
+       )
+                  :H (fn [x] (cond
+                            (= 'e x)(electro-hat)
+                            (= 'c x)(closed-hat)
+                            (= 's x)(snare)
+                            (= 'o x)(open-hat :amp 1 :t 0.1 :low 10000 :hi  2000  )
+                            :else (open-hat)))
+  :bfx (fn[x] (barkfx-n x))
+  :V2 (fn [x] (bass (midi->hz (note x))))
+  :V4 (fn [x y z]
+        ;;(bass :freq (midi->hz (note  x)) :amp y :t 0.1)
+        (my-grunge-bass :note (note  x) :amp (* 4 y) :t 0.1 :pan z) ;; needs adapted grunge-bass
+        ;;(ks-stringer :freq (midi->hz (note  x)) :amp y :t 0.1)
+        ;;(ks1 :note (note  x) :amp y :t 0.1 )
+        )
+  :V3 (fn [x] (my-grunge-bass  (note x)))
+  }
+ )
+
+(seq/set-beat
+ {{:voice :I :il 0} '[ - - - -  x - - -  x - - -  - - - -]
+  :P '[1.0 1.1 1.2 1.0    1.1 1.12 0.9 1.12    1.3 0.1]
+  ;;:W '[1 - - - - - - - - ]
+  :B '[3 4 2 1]
+  :PV '[:a2 :b2 :c3]
+  {:voice :B} '[d - - - d - - - d - - -  d - - -]
+  :H '[c c s c  c c s c  c c s c  c c c c]
+  {:voice :bfx :il 0} '[ - - - -   - - - -    - - - -  0 - - - ]
+  
+  }
+ )
+
+
+;; ensol hard techno?
+;; movo ensol nevolen, dance in the peaceful universe
+
+(inst-fx! bass fx-echo)
+(inst-fx! bass fx-chorus)
+(inst-volume! bass 2)
+(clear-fx bass)
+
+(inst-fx! grunge-bass fx-chorus)
+(inst-volume! grunge-bass 2)
+
+(seq/set-metro :bpm 240 :il 3)
+(seq/set-beat
+ {{:voice :I :il 3} '[ - - - -  x - - -  x - - -  - - - -]
+  {:voice :V3 :il 1} '[:a4 :a4 -  :b4 :a4 :b4 :a4 -]
+  :V2 '[:a2 :b2 :c2 :d2]
+  {:voice :PV :il 3} (fn [] (conj (shuffle '[:a2 :b2 :c3 ]) ':d2))
+  ;;{:voice :PV :il 1} '[:a2 - - :b2 - -  :c3 :d2 - -]
+  ;;:W '[1 - - - - - - - - ]
+  :B '[c -  ]
+  {:voice :H :id 2} '[s s  ]  
+  {:voice :B} '[d - - - d - - - d - - -  d - - -]
+  :H '[ c o]
+  ;;{:voice :bfx :il 0} '[ - - - -   - - - -    - - - -  0 - - - ]
+  
+  }
+ )
+
+;; i want to make a pseudo echo
+;; this is a song, hyperhouse!
+(seq/set-beat
+ {
+  :B '[2 3 3 3]
+  ;; {:voice :V4 :il 3 :echo 1} '[[:a3 0.5] - - - [:b2 0.5] - - -  [:c2 0.5] - - - [:d2 0.5] - - - ]
+  ;; {:voice :V4 :il 3 :echo 2} '[- [:a3 0.4] - - - [:b2 0.4] - - -  [:c2 0.4] - - - [:d2 0.4] - - ]
+  ;; {:voice :V4 :il 3 :echo 3} '[ - - [:a3 0.2] - - - [:b2 0.1] - - -  [:c2 0.1] - - - [:d2 0.1] - ]
+  ;; {:voice :V4 :il 3 :echo 4} '[ - - - [:a3 0.1] - - - [:b2 0.05] - - -  [:c2 0.05] - - - [:d2 0.05] ]  
+  {:voice :V4 :il 3 :echo 1} '[[:a3 0.5 0] - - - [:b2 0.5 0] - - -  [:c2 0.5 0] - - - [:d2 0.5 0] - - - ]
+  {:voice :V4 :il 3 :echo 2} '[- [:a3 0.4 -1] - - - [:b2 0.4 -1] - - -  [:c2 0.4 -1] - - - [:d2 0.4 -1] - - ]
+  {:voice :V4 :il 3 :echo 3} '[ - - [:a3 0.2 1] - - - [:b2 0.1 1] - - -  [:c2 0.1 1] - - - [:d2 0.1 1] - ]
+  {:voice :V4 :il 3 :echo 4} '[ - - - [:a3 0.1 0] - - - [:b2 0.05 0] - - -  [:c2 0.05 0] - - - [:d2 0.05 0] ]  
+  ;; {:voice :V4 :il 3 :echo 1} '[[:a2 0.5] - - - ]
+  ;; {:voice :V4 :il 3 :echo 2} '[- [:a2 0.2] - - ]
+  ;; {:voice :V4 :il 3 :echo 3} '[ - - [:a2 0.1] -]
+  ;; {:voice :V4 :il 3 :echo 4} '[ - - - [:a2 0.05]]  
+  
+; {:voice :V4 :il 0 :echo 2} '[  - [:d2 0.4] - - - [:a2 0.4] - -  - [:b2 0.4] - - -  [:c2 0.4] - -]
+;  {:voice :V4 :il 0 :echo 3} '[ - - [:c2 0.3] - - - [:d2 0.3] - - - [:a2 0.3] [:b2 0.3] -]
+                                        ;  {:voice :V4 :il 1 :echo 5} '[  [:b2 0.05] [:c2 0.05]  [:d2 0.05] [:a2 0.05]]
+  {:voice :bfx :il 127 } '[ 0 1 2 3]
+  }
+ )
+
+
+
+
+
+
+
+
+;; (defsynth fx-g-verb
+;;   "can i copy paste program my own reverb?"
+;;   [bus 0 wet-dry 0.5 room-size 0.5 dampening 0.5]
+;;   (let [source (in bus)
+;;         verbed (g-verb source 200 8)]
+;;     (replace-out bus (* 1.4 verbed))))
+
+
+
+
+(
+
+(:group (:fx-group pacis))
+(synth? (:mixer pacis))
+(synth? fx-echo)
+(:volume pacis)
+(:bus pacis)
+(volume 2)
+
+(seq/play-metro)
+(stop)
+
+(show-graphviz-synth  (:synth (:mixer pacis)))
+(:synth (:mixer pacis))
+(show-graphviz-synth  pacis)
+(show-graphviz-synth fx-echo)
+
+;; workaround, since orig didnt work for unknown reaszons
+
+;; seems cider can wind up in a bad state
+;; then sh wont work
+;; this fails in a bad 
+(println (clojure.java.shell/sh "ls"))
+
+;; it did work to start a cider repl from a shell, and then connect to the port
+;;  /home/joakim/roles/Tools/bin/clojure -Sdeps \{\:deps\ \{nrepl/nrepl\ \{\:mvn/version\ \"1.0.0\"\}\ cider/cider-nrepl\ \{\:mvn/version\ \"0.45.0\"\}\}\ \:aliases\ \{\:cider/nrepl\ \{\:main-opts\ \[\"-m\"\ \"nrepl.cmdline\"\ \"--middleware\"\ \"\[cider.nrepl/cider-middleware\]\"\]\}\}\} -M:cider/nrepl
+;;(cider-connect '(:host "localhost" :port 42329))
+
+;; need bot host and port, otherwise gpg tries to run for mysterious reasons
+
+)
+
+

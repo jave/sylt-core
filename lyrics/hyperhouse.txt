@@ -1,0 +1,37 @@
+{
+ ;;hyperhouse
+ :default
+ [
+  { :voice "v2/en_speaker_9"
+   :path "hyperhouse_en_9"}
+  { :voice "v2/en_speaker_6"
+   :path "hyperhouse_en_6"}
+  ]
+
+ :text
+ [
+
+  {:text "I open the front door and step into the house" :index 0}
+  {:text "The foyer presents itself as an ordinary entrance" :index 1}
+  {:text "something feels subtly off" :index 2}
+  {:text "I move forward into the living room" :index 3}
+  {:text "the furniture  shifts slightly in the corner of my eyes" :index 4}
+  {:text "The wallpaper patterns stretch and contract" :index 5}
+  {:text "Now I'm in the kitchen" :index 6}
+  {:text "Strangely, when I turn a corner, I'm in the foyer again" :index 7}
+  {:text "I retrace my steps hoping to find the living room" :index 8}
+  {:text "Instead I'm  in a bedroom I've never seen before." :index 9}
+  {:text "The disorientation grows stronger as I explore further" :index 10}
+  {:text "Now I'm in a hallway where doors lead to entirely new wings of the house." :index 11}
+  {:text "Opening one door, I step into  a garden," :index 12}
+  {:text "I close the door and find myself in a study" :index 13}
+  {:text "Every room feels connected to multiple others in  ways I dont understand" :index 14}
+  {:text "The staircase winds endlessly upward, yet I revisit places I've already been" :index 15}
+  {:text "The house’s geography makes no sense" :index 16}
+  {:text "each room exists in its own little pocket universe, connected in" :index 17}
+  {:text "ways my  mind struggles to comprehend." :index 18}
+  {:text "As hours turns into days, and days into unknowable stretches of time" :index 19}
+  {:text "my mind can in the end ony hold one thought" :index 20}
+  {:text "to finaly find the front door, and step out into the blessed outside" :index 21}
+
+  ]}
