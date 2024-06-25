@@ -678,3 +678,40 @@
   (let [source (in bus)
         echo (comb-n source max-delay delay-time decay-time)]
     (replace-out bus (pan2 (+ (* echo-level echo) source) 0))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; i want a nicer sample player interface
+
+
+;; cant macroize definst for some reawson?
+;; (defmacro sample-player-inst-maker [inst-name]
+;;   `(definst ~inst-name [bufnum 0 rate 1.0]
+;;      (play-buf :rate rate :num-channels 1 :bufnum bufnum)))
+
+
+;; (sample-player-inst-maker sample-player-inst)
+
+;; (definst sample-player-inst [bufnum 0 rate 1.0]
+;;   (play-buf :rate rate :num-channels 1 :bufnum bufnum))
+
+(defn create-sample-player [path sample-rate amp sample-player-inst]
+  (let [samples (load-samples path)
+        next-idx (atom 0)
+        play-sample (fn [samples n rate amp]
+                      (sample-player-inst (nth samples n) :rate rate :amp amp))]
+    {:play 
+     (fn [] (play-sample samples @next-idx sample-rate amp))
+     :play-n 
+     (fn [n] (play-sample samples n sample-rate amp))
+     :set-index
+     (fn [n] (reset! next-idx 0))
+     :play-next 
+     (fn []
+       (play-sample
+        samples
+        @next-idx
+        sample-rate
+        amp)
+       (swap! next-idx #(if (= (dec (count samples)) %) 0 (inc %)))
+       )}))

@@ -2705,26 +2705,26 @@
 3593.813663804626, 4641.588833612776]
 )
 
-(defsynth fx-vocoder2
-  [bus 0 amp 0.1 freq 440 gated 1 pan 0]
-  (let [input (in bus)
-        ;;bands 16
-        ;;band-frequencies (lin-exp (range 1 (inc bands)) 1 bands 100 8000)
-        modulator input
-        carrier (saw:ar freq)
-        mod-localbuf (local-buf 2048)
-        car-localbuf (local-buf 2048)
-        env (env-gen:kr (env-asr 0.01 1 0.1) :gate gated :action 2)
-        balance-voice (mix:ar (bpf:ar input band-frequencies :rq 0.2))
-        analyse-freq
-        (doall (for [buf [mod-localbuf car-localbuf]]
-                 (pv-mag-smear (fft buf modulator) 1 )))
-        mod-pv (first analyse-freq)
-        car-pv (second analyse-freq)
-        voice (ifft (pv-mag-mul car-pv mod-pv))
-        sig (mix:ar [(white-noise:ar (balance-voice)) voice])]
-    (replace-out bus (pan2:ar (* sig env) pan amp))
-    ))
+;; (defsynth fx-vocoder2
+;;   [bus 0 amp 0.1 freq 440 gated 1 pan 0]
+;;   (let [input (in bus)
+;;         ;;bands 16
+;;         ;;band-frequencies (lin-exp (range 1 (inc bands)) 1 bands 100 8000)
+;;         modulator input
+;;         carrier (saw:ar freq)
+;;         mod-localbuf (local-buf 2048)
+;;         car-localbuf (local-buf 2048)
+;;         env (env-gen:kr (env-asr 0.01 1 0.1) :gate gated :action 2)
+;;         balance-voice (mix:ar (bpf:ar input band-frequencies :rq 0.2))
+;;         analyse-freq
+;;         (doall (for [buf [mod-localbuf car-localbuf]]
+;;                  (pv-mag-smear (fft buf modulator) 1 )))
+;;         mod-pv (first analyse-freq)
+;;         car-pv (second analyse-freq)
+;;         voice (ifft (pv-mag-mul car-pv mod-pv))
+;;         sig (mix:ar [(white-noise:ar (balance-voice)) voice])]
+;;     (replace-out bus (pan2:ar (* sig env) pan amp))
+;;     ))
 
 ;; ;; Play the synth
 ;; (def inst (vocoder))
@@ -2758,16 +2758,18 @@
     (replace-out bus [normalizedl normalizedr])
     ))
 
-;;redefine, orig buggy
-(definst my-grunge-bass
-  [note 48 amp 1 dur 0.1 a 0.01 d 0.01 s 0.4 r 0.01 pan 0.0]
+
+
+;;redefine, orig buggy, didnt have amp, also added pan2
+(definst my-grunge-bass2
+  [note 48 amp 1 dur 0.1 a 0.01 d 0.01 s 0.4 r 0.01 pan 0.0 filter 1.0]
   (let [freq    (midicps note)
         env     (env-gen (adsr a d s r) (line:kr 1 0 (+ a d dur r 0.1))
                          :action FREE)
         src     (saw [freq (* 0.98 freq) (* 2.015 freq)])
         src     (clip2 (* 1.3 src) 0.9)
         sub     (sin-osc (/ freq 2))
-        filt    (resonz (rlpf src (* 8.4 freq) 0.29) (* 2.0 freq) 2.9)
+        filt    (resonz (rlpf src (* 8.4 filter freq) 0.29) (* 2.0 filter freq) 2.9)
         meat    (ring4 filt sub)
         sliced  (rlpf meat (* 2 freq) 0.1)
         bounced (free-verb sliced 0.8 0.9 0.2)]
@@ -2778,6 +2780,19 @@
 ;;(inst-fx! pacis fx-echo)
 (inst-volume! pacis 0.2)
 (inst-volume! closed-hat 0.2)
+(def mygrunge-patches
+  '[{:filter 1.0 :amp 4}
+    {:filter 0.9 :amp 3.6}
+    {:filter 0.8 :amp 3.3}
+    {:filter 0.7 :amp 3}
+    {:filter 0.6 :amp 2.6}
+    {:filter 0.5 :amp 2.3}
+    {:filter 0.4 :amp 2}
+    {:filter 0.3 :amp 1.6}
+    {:filter 0.2 :amp 1.3}
+    {:filter 0.1 :amp 1}])
+(def mygrunge-patches-index (atom 0))
+
 (seq/set-drums
  {:I (fn [x]     (pacis-n-next))
   :P (fn [x] (ctl pitchoid :pitch x))
@@ -2804,20 +2819,24 @@
   :V2 (fn [x] (bass (midi->hz (note x))))
   :V4 (fn [x y z]
         ;;(bass :freq (midi->hz (note  x)) :amp y :t 0.1)
-        (my-grunge-bass :note (note  x) :amp (* 4 y) :t 0.1 :pan z) ;; needs adapted grunge-bass
+        (let [patch (get mygrunge-patches @mygrunge-patches-index)]
+          (my-grunge-bass2 :filter (:filter patch) :note (note  x) :amp (* (:amp patch) y) :t 0.6 :pan z)) ;; needs adapted grunge-bass
         ;;(ks-stringer :freq (midi->hz (note  x)) :amp y :t 0.1)
         ;;(ks1 :note (note  x) :amp y :t 0.1 )
         )
-  :V3 (fn [x] (my-grunge-bass  (note x)))
+  :V3 (fn [x] (my-grunge-bass2  (note x)))
+  :V4-patch (fn [x] (reset! mygrunge-patches-index x))
+  :hh (fn [x] ((:play-next hyperhouse-player)))
   }
  )
 
+(seq/set-metro :bpm 240 :il 3)
 (seq/set-beat
  {{:voice :I :il 0} '[ - - - -  x - - -  x - - -  - - - -]
   :P '[1.0 1.1 1.2 1.0    1.1 1.12 0.9 1.12    1.3 0.1]
   ;;:W '[1 - - - - - - - - ]
   :B '[3 4 2 1]
-  :PV '[:a2 :b2 :c3]
+  :PV '[:a2 :b2 :c3] ;;'[:a2 :c3 :e2 :g2 :a2 :g2 :e2 :c3] ;;
   {:voice :B} '[d - - - d - - - d - - -  d - - -]
   :H '[c c s c  c c s c  c c s c  c c c c]
   {:voice :bfx :il 0} '[ - - - -   - - - -    - - - -  0 - - - ]
@@ -2826,7 +2845,7 @@
  )
 
 
-;; ensol hard techno?
+;; * song: ensol dance (name undecided)
 ;; movo ensol nevolen, dance in the peaceful universe
 
 (inst-fx! bass fx-echo)
@@ -2854,8 +2873,30 @@
   }
  )
 
+
+
+;; * Song: Hyperhouse!
+
+;; Usage example. the definst arg like this was because i couldnt macroize it.
+(def hyperhouse-player (create-sample-player "/home/joakim/roles/Creative/music/overtone-sylt/minisylt2024/hyperhouse_en_9/*"
+                                             0.4
+                                             4
+                                             (definst sample-player-hyperhouse [bufnum 0 rate 1.0 amp 1.0]
+                                               (* amp (play-buf :rate rate :num-channels 1 :bufnum bufnum)))))
+
+;; Plays the next sample
+((:play-next hyperhouse-player))
+((:set-index hyperhouse-player) 0)
+((:play hyperhouse-player)) 
+((:play-n hyperhouse-player) 1)
+;;(inst-volume! sample-player-hyperhouse 1)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(inst-fx! sample-player-hyperhouse fx-vocoder)
+(clear-fx sample-player-hyperhouse)
+
 ;; i want to make a pseudo echo
-;; this is a song, hyperhouse!
+
 (seq/set-beat
  {
   :B '[2 3 3 3]
@@ -2866,7 +2907,9 @@
   {:voice :V4 :il 3 :echo 1} '[[:a3 0.5 0] - - - [:b2 0.5 0] - - -  [:c2 0.5 0] - - - [:d2 0.5 0] - - - ]
   {:voice :V4 :il 3 :echo 2} '[- [:a3 0.4 -1] - - - [:b2 0.4 -1] - - -  [:c2 0.4 -1] - - - [:d2 0.4 -1] - - ]
   {:voice :V4 :il 3 :echo 3} '[ - - [:a3 0.2 1] - - - [:b2 0.1 1] - - -  [:c2 0.1 1] - - - [:d2 0.1 1] - ]
-  {:voice :V4 :il 3 :echo 4} '[ - - - [:a3 0.1 0] - - - [:b2 0.05 0] - - -  [:c2 0.05 0] - - - [:d2 0.05 0] ]  
+  {:voice :V4 :il 3 :echo 4} '[ - - - [:a3 0.1 0] - - - [:b2 0.05 0] - - -  [:c2 0.05 0] - - - [:d2 0.05 0] ]
+
+  {:voice :V4-patch :il 127} '[0 1 2 3 4 5 6 7 8 9]
   ;; {:voice :V4 :il 3 :echo 1} '[[:a2 0.5] - - - ]
   ;; {:voice :V4 :il 3 :echo 2} '[- [:a2 0.2] - - ]
   ;; {:voice :V4 :il 3 :echo 3} '[ - - [:a2 0.1] -]
@@ -2875,11 +2918,12 @@
 ; {:voice :V4 :il 0 :echo 2} '[  - [:d2 0.4] - - - [:a2 0.4] - -  - [:b2 0.4] - - -  [:c2 0.4] - -]
 ;  {:voice :V4 :il 0 :echo 3} '[ - - [:c2 0.3] - - - [:d2 0.3] - - - [:a2 0.3] [:b2 0.3] -]
                                         ;  {:voice :V4 :il 1 :echo 5} '[  [:b2 0.05] [:c2 0.05]  [:d2 0.05] [:a2 0.05]]
-  {:voice :bfx :il 127 } '[ 0 1 2 3]
+  {:voice :bfx :il 127 } '[ 0 1 2 3] ;;7
+  {:voice :hh :il 127 } '[ x] ;;8
   }
  )
 
-
+((:set-index hyperhouse-player) 0)
 
 
 
